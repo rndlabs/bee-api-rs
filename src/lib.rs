@@ -17,6 +17,7 @@ pub struct UploadConfig {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SwarmReference {
+    #[serde(rename(deserialize = "reference"))]
     pub ref_: String,
 }
 
