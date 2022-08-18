@@ -1,7 +1,9 @@
-use std::error::Error;
+use std::error::{Error, self};
 
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
+
+type Result<T> = std::result::Result<T, Box<dyn error::Error + Send>>;
 
 pub struct BeeConfig {
     pub upload: Option<UploadConfig>,
@@ -26,25 +28,34 @@ pub async fn bytes_get(
     client: Client,
     base_uri: String,
     ref_: String,
-) -> Result<(Vec<u8>, String), Box<dyn Error>> {
+) -> Result<(Vec<u8>, String)> {
     let url = format!("{}/bytes/{}", base_uri, ref_);
-    let res = client.get(&url).send().await?;
+    let res = client.get(&url).send().await;
 
-    // bubble up if there is an error
+    // bubble up if there was an error making the request
+    let res = match res {
+        Ok(res) => res,
+        Err(e) => return Err(Box::new(e)),
+    };
+
+    // bubble up if the response was not successful
     if !res.status().is_success() {
         return Err(Box::new(res.error_for_status().unwrap_err()));
     }
 
-    // read the response body
-    let content_type = if let Some(content_type) = res.headers().get("Content-Type") {
-        content_type.to_str()?.to_string()
-    } else {
-        "application/octet-stream".to_string()
-    };
+    // get the content type or set default if not present
+    let content_type = res
+        .headers()
+        .get("content-type")
+        .map(|ct| ct.to_str().unwrap().to_string())
+        .unwrap_or_else(|| "application/octet-stream".to_string());
 
-    let data = &res.bytes().await?;
-
-    Ok((data.to_vec(), content_type))
+    // get the data from the response
+    let data = res.bytes().await;
+    match data {
+        Ok(data) => Ok((data.to_vec(), content_type)),
+        Err(e) => Err(Box::new(e)),
+    }
 }
 
 // upload the data to the swarm using the bytes endpoint
@@ -54,7 +65,7 @@ pub async fn bytes_post(
     base_uri: String,
     data: Vec<u8>,
     config: &UploadConfig,
-) -> Result<SwarmReference, Box<dyn Error>> {
+) -> Result<SwarmReference> {
     let mut headers = reqwest::header::HeaderMap::new();
 
     // process the config
@@ -74,9 +85,24 @@ pub async fn bytes_post(
         .body(data)
         .headers(headers)
         .send()
-        .await?;
-    let res = res.json::<SwarmReference>().await?;
-    Ok(res)
+        .await;
+    // bubble up if there is an error
+    match res {
+        Ok(res) => {
+            match res.status().is_success() {
+                true => {
+                    match res.json::<SwarmReference>().await {
+                        Ok(ref_) => Ok(ref_),
+                        Err(e) => Err(Box::new(e)),
+                    }
+                }
+                false => Err(Box::new(res.error_for_status().unwrap_err())),
+            }
+        }
+        Err(e) => {
+            Err(Box::new(e))
+        }
+    }
 }
 
 // #[cfg(test)]
