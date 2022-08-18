@@ -1,4 +1,4 @@
-use std::error::{Error, self};
+use std::error;
 
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -88,20 +88,14 @@ pub async fn bytes_post(
         .await;
     // bubble up if there is an error
     match res {
-        Ok(res) => {
-            match res.status().is_success() {
-                true => {
-                    match res.json::<SwarmReference>().await {
-                        Ok(ref_) => Ok(ref_),
-                        Err(e) => Err(Box::new(e)),
-                    }
-                }
-                false => Err(Box::new(res.error_for_status().unwrap_err())),
-            }
-        }
-        Err(e) => {
-            Err(Box::new(e))
-        }
+        Ok(res) => match res.status().is_success() {
+            true => match res.json::<SwarmReference>().await {
+                Ok(ref_) => Ok(ref_),
+                Err(e) => Err(Box::new(e)),
+            },
+            false => Err(Box::new(res.error_for_status().unwrap_err())),
+        },
+        Err(e) => Err(Box::new(e)),
     }
 }
 
