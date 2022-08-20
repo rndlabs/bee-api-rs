@@ -5,10 +5,12 @@ use serde::{Deserialize, Serialize};
 
 type Result<T> = std::result::Result<T, Box<dyn error::Error + Send>>;
 
+#[derive(Debug, Clone)]
 pub struct BeeConfig {
     pub upload: Option<UploadConfig>,
 }
 
+#[derive(Debug, Clone)]
 pub struct UploadConfig {
     pub stamp: String,
     pub pin: Option<bool>,
