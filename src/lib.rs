@@ -15,7 +15,7 @@ pub struct UploadConfig {
     pub stamp: String,
     pub pin: Option<bool>,
     // pub encrypt: Option<String>,
-    pub tag: Option<String>,
+    pub tag: Option<u32>,
     pub deferred: Option<bool>,
 }
 
@@ -23,6 +23,16 @@ pub struct UploadConfig {
 pub struct SwarmReference {
     #[serde(rename(deserialize = "reference"))]
     pub ref_: String,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct SwarmTag {
+    pub uid: u32,
+    #[serde(rename(deserialize = "startedAt"))]
+    pub started_at: String,
+    pub total: u64,
+    pub processed: u64,
+    pub synced: u64,
 }
 
 // download the data from the swarm using the bytes endpoint
@@ -60,6 +70,57 @@ pub async fn bytes_get(
     }
 }
 
+// create a new tag
+pub async fn tag_post(
+    client: &Client,
+    base_uri: String,
+) -> Result<SwarmTag> {
+    let url = format!("{}/tags", base_uri);
+    let res = client.post(&url).send().await;
+
+    // bubble up if there was an error making the request
+    let res = match res {
+        Ok(res) => res,
+        Err(e) => return Err(Box::new(e)),
+    };
+
+    // bubble up if the response was not successful
+    if !res.status().is_success() {
+        return Err(Box::new(res.error_for_status().unwrap_err()));
+    }
+
+    // get the data from the response
+    let data = res.json::<SwarmTag>().await;
+    match data {
+        Ok(data) => Ok(data),
+        Err(e) => Err(Box::new(e)),
+    }
+}
+
+// get information on a tag
+pub async fn get_tag(
+    client: Client,
+    base_uri: String,
+    tag: u32,
+) -> Result<SwarmTag> {
+    let res = client
+        .post(format!("{}/tags/{}", base_uri, tag.to_string()))
+        .send()
+        .await;
+    
+    // bubble up if there is an error
+    match res {
+        Ok(res) => match res.status().is_success() {
+            true => match res.json::<SwarmTag>().await {
+                Ok(ref_) => Ok(ref_),
+                Err(e) => Err(Box::new(e)),
+            },
+            false => Err(Box::new(res.error_for_status().unwrap_err())),
+        },
+        Err(e) => Err(Box::new(e)),
+    }
+}
+
 // upload the data to the swarm using the bytes endpoint
 // should return the reference from swarm
 pub async fn bytes_post(
@@ -76,7 +137,7 @@ pub async fn bytes_post(
         headers.insert("swarm-pin", "true".parse().unwrap());
     }
     if let Some(tag) = &config.tag {
-        headers.insert("swarm-tag", tag.parse().unwrap());
+        headers.insert("swarm-tag", tag.to_string().parse().unwrap());
     }
     if let Some(deferred) = &config.deferred && !deferred {
         headers.insert("swarm-deferred", "false".parse().unwrap());
