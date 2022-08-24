@@ -104,7 +104,7 @@ pub async fn get_tag(
     tag: u32,
 ) -> Result<SwarmTag> {
     let res = client
-        .post(format!("{}/tags/{}", base_uri, tag.to_string()))
+        .post(format!("{}/tags/{}", base_uri, tag))
         .send()
         .await;
     
