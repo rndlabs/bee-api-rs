@@ -44,6 +44,9 @@ pub async fn bytes_get(
     let url = format!("{}/bytes/{}", base_uri, ref_);
     let res = client.get(&url).send().await;
 
+    // print the url and the response status
+    // println!("GET API: {} {}", url, res.as_ref().unwrap().status());
+
     // bubble up if there was an error making the request
     let res = match res {
         Ok(res) => res,
