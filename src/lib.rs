@@ -37,7 +37,7 @@ pub struct SwarmTag {
 
 // download the data from the swarm using the bytes endpoint
 pub async fn bytes_get(
-    client: Client,
+    client: &Client,
     base_uri: String,
     ref_: String,
 ) -> Result<(Vec<u8>, String)> {
@@ -98,7 +98,7 @@ pub async fn tag_post(client: &Client, base_uri: String) -> Result<SwarmTag> {
 }
 
 // get information on a tag
-pub async fn get_tag(client: Client, base_uri: String, tag: u32) -> Result<SwarmTag> {
+pub async fn get_tag(client: &Client, base_uri: String, tag: u32) -> Result<SwarmTag> {
     let res = client
         .post(format!("{}/tags/{}", base_uri, tag))
         .send()
@@ -120,7 +120,7 @@ pub async fn get_tag(client: Client, base_uri: String, tag: u32) -> Result<Swarm
 // upload the data to the swarm using the bytes endpoint
 // should return the reference from swarm
 pub async fn bytes_post(
-    client: Client,
+    client: &Client,
     base_uri: String,
     data: Vec<u8>,
     config: &UploadConfig,
