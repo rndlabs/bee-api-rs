@@ -74,10 +74,7 @@ pub async fn bytes_get(
 }
 
 // create a new tag
-pub async fn tag_post(
-    client: &Client,
-    base_uri: String,
-) -> Result<SwarmTag> {
+pub async fn tag_post(client: &Client, base_uri: String) -> Result<SwarmTag> {
     let url = format!("{}/tags", base_uri);
     let res = client.post(&url).send().await;
 
@@ -101,16 +98,12 @@ pub async fn tag_post(
 }
 
 // get information on a tag
-pub async fn get_tag(
-    client: Client,
-    base_uri: String,
-    tag: u32,
-) -> Result<SwarmTag> {
+pub async fn get_tag(client: Client, base_uri: String, tag: u32) -> Result<SwarmTag> {
     let res = client
         .post(format!("{}/tags/{}", base_uri, tag))
         .send()
         .await;
-    
+
     // bubble up if there is an error
     match res {
         Ok(res) => match res.status().is_success() {
