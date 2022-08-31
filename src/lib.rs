@@ -157,14 +157,3 @@ pub async fn bytes_post(
         Err(e) => Err(Box::new(e)),
     }
 }
-
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-
-//     #[test]
-//     fn it_works() {
-//         let result = add(2, 2);
-//         assert_eq!(result, 4);
-//     }
-// }
