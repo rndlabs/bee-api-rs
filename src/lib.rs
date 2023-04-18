@@ -1,6 +1,10 @@
 #![feature(let_chains)]
+
+pub mod pss;
+
 use std::error;
 
+use anyhow::Context;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 
@@ -34,6 +38,17 @@ pub struct SwarmTag {
     pub total: u64,
     pub processed: u64,
     pub synced: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct Addresses {
+    pub overlay: String,
+    pub underlay: Vec<String>,
+    pub ethereum: String,
+    #[serde(alias = "publicKey")]
+    pub public_key: String,
+    #[serde(alias = "pssPublicKey")]
+    pub pss_public_key: String,
 }
 
 // download the data from the swarm using the bytes endpoint
@@ -158,3 +173,14 @@ pub async fn bytes_post(
         Err(e) => Err(Box::new(e)),
     }
 }
+
+// Returns node connectivity information, requires spawning the node with --restricted
+pub async fn get_addresses(
+    client: &Client,
+    endpoint: &str, 
+) -> Result<Addresses> {
+    let endpoint = format!("{endpoint}/addresses");
+    let req = client.get(endpoint).build().with_context(|| "failed to build request")?;
+    Ok(client.execute(req).await.with_context(|| "failed to execute request")?.json().await.with_context(|| "failed to deserialize response")?)
+}
+
