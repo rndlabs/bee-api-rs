@@ -1,7 +1,6 @@
-
-
 use anyhow::{anyhow, Context, Result};
 use clap::{Arg, Command};
+use tokio::signal::ctrl_c;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -15,26 +14,39 @@ async fn main() -> Result<()> {
         )
         .subcommands(vec![
             Command::new("subscribe")
-            .about("subscribe to a given topic")
-            .arg(topic_flag()),
+                .about("subscribe to a given topic")
+                .arg(topic_flag()),
             Command::new("publish")
-            .about("publish a message to a pss topic")
-            .arg(topic_flag())
-            .arg(recipient_flag())
-            .arg(postage_batch_id_flag())
-            .arg(target_flag())
-            .arg(data_flag()),
-            Command::new("addresses")
-            .about("return node underlay and overlay addresses"),
+                .about("publish a message to a pss topic")
+                .arg(topic_flag())
+                .arg(recipient_flag())
+                .arg(postage_batch_id_flag())
+                .arg(target_flag())
+                .arg(data_flag()),
+            Command::new("addresses").about("return node underlay and overlay addresses"),
         ])
         .get_matches();
     match matches.subcommand() {
-        Some((("subscribe", s))) => {
-            bee_api::pss::subscribe_topic(
-                &matches.get_one::<String>("endpoint").unwrap(),
-                &s.get_one::<String>("topic").unwrap(),
-            )
-            .await?;
+        Some(("subscribe", s)) => {
+            let endpoint = matches.get_one::<String>("endpoint").unwrap().clone();
+            let topic = s.get_one::<String>("topic").unwrap().clone();
+            let (tx, mut rx) = tokio::sync::mpsc::channel(10);
+            let fut = tokio::task::spawn(async move {
+                if let Err(err) = bee_api::pss::subscribe_topic(&endpoint, &topic, tx).await {
+                    println!("topic subscription received error {err:#?}");
+                }
+            });
+            loop {
+                tokio::select! {
+                    _ = ctrl_c() => {
+                        fut.abort();
+                    }
+                    msg = rx.recv() => {
+                        println!("received message {msg:#?}");
+
+                    }
+                }
+            }
         }
         Some(("publish", s)) => {
             bee_api::pss::publish_topic(
@@ -44,14 +56,17 @@ async fn main() -> Result<()> {
                 &s.get_one::<String>("target-msg-prefix").unwrap(),
                 &s.get_one::<String>("recipient").unwrap(),
                 &s.get_one::<String>("postage-batch-id").unwrap(),
-                s.get_one::<String>("data").unwrap().as_bytes()
-            ).await?;
+                s.get_one::<String>("data").unwrap().as_bytes(),
+            )
+            .await?;
         }
         Some(("addresses", _)) => {
             match bee_api::get_addresses(
                 &reqwest::Client::new(),
-                &matches.get_one::<String>("endpoint").unwrap()
-            ).await {
+                &matches.get_one::<String>("endpoint").unwrap(),
+            )
+            .await
+            {
                 Ok(res) => println!("{res:#?}"),
                 Err(err) => return Err(anyhow!("failed to get addresses {err:#?}")),
             }
@@ -85,14 +100,14 @@ fn postage_batch_id_flag() -> Arg<'static> {
 
 fn target_flag() -> Arg<'static> {
     Arg::new("target-msg-prefix")
-    .long("target-msg-prefix")
-    .takes_value(true)
-    .help("target message address prefix")
+        .long("target-msg-prefix")
+        .takes_value(true)
+        .help("target message address prefix")
 }
 
 fn data_flag() -> Arg<'static> {
     Arg::new("data")
-    .long("data")
-    .takes_value(true)
-    .help("arbitrary data to use with uploads")
+        .long("data")
+        .takes_value(true)
+        .help("arbitrary data to use with uploads")
 }
