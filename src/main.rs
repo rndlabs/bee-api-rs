@@ -31,20 +31,14 @@ async fn main() -> Result<()> {
             let endpoint = matches.get_one::<String>("endpoint").unwrap().clone();
             let topic = s.get_one::<String>("topic").unwrap().clone();
             let (tx, mut rx) = tokio::sync::mpsc::channel(10);
-            let fut = tokio::task::spawn(async move {
+            tokio::task::spawn(async move {
                 if let Err(err) = bee_api::pss::subscribe_topic(&endpoint, &topic, tx).await {
                     println!("topic subscription received error {err:#?}");
                 }
             });
             loop {
-                tokio::select! {
-                    _ = ctrl_c() => {
-                        fut.abort();
-                    }
-                    msg = rx.recv() => {
-                        println!("received message {msg:#?}");
-
-                    }
+                if let Some(msg) = rx.recv().await {
+                    println!("received message {msg:#?}");
                 }
             }
         }
